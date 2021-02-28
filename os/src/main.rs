@@ -3,7 +3,6 @@
 #![feature(global_asm)]
 #![feature(llvm_asm)]
 #![feature(panic_info_message)]
-#![feature(const_in_array_repeat_expressions)]
 
 #[macro_use]
 mod console;

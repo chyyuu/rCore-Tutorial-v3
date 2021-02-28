@@ -2,11 +2,13 @@ use crate::config::*;
 use crate::task::TaskContext;
 use crate::trap::TrapContext;
 
+#[derive(Copy, Clone)]
 #[repr(align(4096))]
 struct KernelStack {
     data: [u8; KERNEL_STACK_SIZE],
 }
 
+#[derive(Copy, Clone)]
 #[repr(align(4096))]
 struct UserStack {
     data: [u8; USER_STACK_SIZE],
