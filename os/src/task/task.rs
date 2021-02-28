@@ -1,13 +1,13 @@
-use crate::mm::{MemorySet, PhysPageNum, KERNEL_SPACE, VirtAddr};
-use crate::trap::{TrapContext, trap_handler};
-use crate::config::{TRAP_CONTEXT};
 use super::TaskContext;
-use super::{PidHandle, pid_alloc, KernelStack};
-use alloc::sync::{Weak, Arc};
+use super::{pid_alloc, KernelStack, PidHandle};
+use crate::config::TRAP_CONTEXT;
+use crate::fs::{File, Stdin, Stdout};
+use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use crate::trap::{trap_handler, TrapContext};
+use alloc::sync::{Arc, Weak};
 use alloc::vec;
 use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
-use crate::fs::{File, Stdin, Stdout};
 
 pub struct TaskControlBlock {
     // immutable
@@ -46,8 +46,7 @@ impl TaskControlBlockInner {
         self.get_status() == TaskStatus::Zombie
     }
     pub fn alloc_fd(&mut self) -> usize {
-        if let Some(fd) = (0..self.fd_table.len())
-            .find(|fd| self.fd_table[*fd].is_none()) {
+        if let Some(fd) = (0..self.fd_table.len()).find(|fd| self.fd_table[*fd].is_none()) {
             fd
         } else {
             self.fd_table.push(None);
@@ -135,9 +134,7 @@ impl TaskControlBlock {
         // ---- hold parent PCB lock
         let mut parent_inner = self.acquire_inner_lock();
         // copy user space(include trap context)
-        let memory_set = MemorySet::from_existed_user(
-            &parent_inner.memory_set
-        );
+        let memory_set = MemorySet::from_existed_user(&parent_inner.memory_set);
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
@@ -186,7 +183,6 @@ impl TaskControlBlock {
     pub fn getpid(&self) -> usize {
         self.pid.0
     }
-
 }
 
 #[derive(Copy, Clone, PartialEq)]

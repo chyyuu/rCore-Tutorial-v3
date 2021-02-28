@@ -1,10 +1,8 @@
 use super::File;
+use crate::mm::UserBuffer;
+use crate::task::suspend_current_and_run_next;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
-use crate::mm::{
-    UserBuffer,
-};
-use crate::task::suspend_current_and_run_next;
 
 pub struct Pipe {
     readable: bool,
@@ -102,12 +100,8 @@ impl PipeRingBuffer {
 /// Return (read_end, write_end)
 pub fn make_pipe() -> (Arc<Pipe>, Arc<Pipe>) {
     let buffer = Arc::new(Mutex::new(PipeRingBuffer::new()));
-    let read_end = Arc::new(
-        Pipe::read_end_with_buffer(buffer.clone())
-    );
-    let write_end = Arc::new(
-        Pipe::write_end_with_buffer(buffer.clone())
-    );
+    let read_end = Arc::new(Pipe::read_end_with_buffer(buffer.clone()));
+    let write_end = Arc::new(Pipe::write_end_with_buffer(buffer.clone()));
     buffer.lock().set_write_end(&write_end);
     (read_end, write_end)
 }
@@ -131,7 +125,9 @@ impl File for Pipe {
             // read at most loop_read bytes
             for _ in 0..loop_read {
                 if let Some(byte_ref) = buf_iter.next() {
-                    unsafe { *byte_ref = ring_buffer.read_byte(); }
+                    unsafe {
+                        *byte_ref = ring_buffer.read_byte();
+                    }
                     read_size += 1;
                 } else {
                     return read_size;
