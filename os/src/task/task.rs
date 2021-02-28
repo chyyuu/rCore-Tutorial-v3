@@ -1,7 +1,7 @@
-use crate::mm::{MemorySet, MapPermission, PhysPageNum, KERNEL_SPACE, VirtAddr};
-use crate::trap::{TrapContext, trap_handler};
-use crate::config::{TRAP_CONTEXT, kernel_stack_position};
 use super::TaskContext;
+use crate::config::{kernel_stack_position, TRAP_CONTEXT};
+use crate::mm::{MapPermission, MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use crate::trap::{trap_handler, TrapContext};
 
 pub struct TaskControlBlock {
     pub task_cx_ptr: usize,
@@ -31,15 +31,16 @@ impl TaskControlBlock {
         let task_status = TaskStatus::Ready;
         // map a kernel-stack in kernel space
         let (kernel_stack_bottom, kernel_stack_top) = kernel_stack_position(app_id);
-        KERNEL_SPACE
-            .lock()
-            .insert_framed_area(
-                kernel_stack_bottom.into(),
-                kernel_stack_top.into(),
-                MapPermission::R | MapPermission::W,
-            );
-        let task_cx_ptr = (kernel_stack_top - core::mem::size_of::<TaskContext>()) as *mut TaskContext;
-        unsafe { *task_cx_ptr = TaskContext::goto_trap_return(); }
+        KERNEL_SPACE.lock().insert_framed_area(
+            kernel_stack_bottom.into(),
+            kernel_stack_top.into(),
+            MapPermission::R | MapPermission::W,
+        );
+        let task_cx_ptr =
+            (kernel_stack_top - core::mem::size_of::<TaskContext>()) as *mut TaskContext;
+        unsafe {
+            *task_cx_ptr = TaskContext::goto_trap_return();
+        }
         let task_control_block = Self {
             task_cx_ptr: task_cx_ptr as usize,
             task_status,

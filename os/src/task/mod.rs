@@ -2,13 +2,13 @@ mod context;
 mod switch;
 mod task;
 
-use crate::loader::{get_num_app, get_app_data};
+use crate::loader::{get_app_data, get_num_app};
 use crate::trap::TrapContext;
+use alloc::vec::Vec;
 use core::cell::RefCell;
 use lazy_static::*;
 use switch::__switch;
 use task::{TaskControlBlock, TaskStatus};
-use alloc::vec::Vec;
 
 pub use context::TaskContext;
 
@@ -31,10 +31,7 @@ lazy_static! {
         println!("num_app = {}", num_app);
         let mut tasks: Vec<TaskControlBlock> = Vec::new();
         for i in 0..num_app {
-            tasks.push(TaskControlBlock::new(
-                get_app_data(i),
-                i,
-            ));
+            tasks.push(TaskControlBlock::new(get_app_data(i), i));
         }
         TaskManager {
             num_app,
@@ -52,10 +49,7 @@ impl TaskManager {
         let next_task_cx_ptr2 = self.inner.borrow().tasks[0].get_task_cx_ptr2();
         let _unused: usize = 0;
         unsafe {
-            __switch(
-                &_unused as *const _,
-                next_task_cx_ptr2,
-            );
+            __switch(&_unused as *const _, next_task_cx_ptr2);
         }
     }
 
@@ -76,9 +70,7 @@ impl TaskManager {
         let current = inner.current_task;
         (current + 1..current + self.num_app + 1)
             .map(|id| id % self.num_app)
-            .find(|id| {
-                inner.tasks[*id].task_status == TaskStatus::Ready
-            })
+            .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
     }
 
     fn get_current_token(&self) -> usize {
@@ -103,10 +95,7 @@ impl TaskManager {
             let next_task_cx_ptr2 = inner.tasks[next].get_task_cx_ptr2();
             core::mem::drop(inner);
             unsafe {
-                __switch(
-                    current_task_cx_ptr2,
-                    next_task_cx_ptr2,
-                );
+                __switch(current_task_cx_ptr2, next_task_cx_ptr2);
             }
         } else {
             panic!("All applications completed!");
