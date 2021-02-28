@@ -1,9 +1,9 @@
-use crate::mm::{MemorySet, PhysPageNum, KERNEL_SPACE, VirtAddr};
-use crate::trap::{TrapContext, trap_handler};
-use crate::config::{TRAP_CONTEXT};
 use super::TaskContext;
-use super::{PidHandle, pid_alloc, KernelStack};
-use alloc::sync::{Weak, Arc};
+use super::{pid_alloc, KernelStack, PidHandle};
+use crate::config::TRAP_CONTEXT;
+use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use crate::trap::{trap_handler, TrapContext};
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
 
@@ -115,9 +115,7 @@ impl TaskControlBlock {
         // ---- hold parent PCB lock
         let mut parent_inner = self.acquire_inner_lock();
         // copy user space(include trap context)
-        let memory_set = MemorySet::from_existed_user(
-            &parent_inner.memory_set
-        );
+        let memory_set = MemorySet::from_existed_user(&parent_inner.memory_set);
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
