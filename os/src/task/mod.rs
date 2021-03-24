@@ -26,12 +26,12 @@ unsafe impl Sync for TaskManager {}
 lazy_static! {
     pub static ref TASK_MANAGER: TaskManager = {
         let num_app = get_num_app();
-        let mut tasks = [
-            TaskControlBlock { task_cx_ptr: 0, task_status: TaskStatus::UnInit };
-            MAX_APP_NUM
-        ];
+        let mut tasks = [TaskControlBlock {
+            task_cx_ptr: 0,
+            task_status: TaskStatus::UnInit,
+        }; MAX_APP_NUM];
         for i in 0..num_app {
-            tasks[i].task_cx_ptr = init_app_cx(i) as * const _ as usize;
+            tasks[i].task_cx_ptr = init_app_cx(i) as *const _ as usize;
             tasks[i].task_status = TaskStatus::Ready;
         }
         TaskManager {
@@ -50,10 +50,7 @@ impl TaskManager {
         let next_task_cx_ptr2 = self.inner.borrow().tasks[0].get_task_cx_ptr2();
         let _unused: usize = 0;
         unsafe {
-            __switch(
-                &_unused as *const _,
-                next_task_cx_ptr2,
-            );
+            __switch(&_unused as *const _, next_task_cx_ptr2);
         }
     }
 
@@ -74,9 +71,7 @@ impl TaskManager {
         let current = inner.current_task;
         (current + 1..current + self.num_app + 1)
             .map(|id| id % self.num_app)
-            .find(|id| {
-                inner.tasks[*id].task_status == TaskStatus::Ready
-            })
+            .find(|id| inner.tasks[*id].task_status == TaskStatus::Ready)
     }
 
     fn run_next_task(&self) {
@@ -89,10 +84,7 @@ impl TaskManager {
             let next_task_cx_ptr2 = inner.tasks[next].get_task_cx_ptr2();
             core::mem::drop(inner);
             unsafe {
-                __switch(
-                    current_task_cx_ptr2,
-                    next_task_cx_ptr2,
-                );
+                __switch(current_task_cx_ptr2, next_task_cx_ptr2);
             }
         } else {
             panic!("All applications completed!");
