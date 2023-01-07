@@ -1,9 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/trap/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script src="../../../crates.js"></script><script defer src="../../../main.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script>
-    <noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../os/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
-        </a><h2 class="location"></h2>
-    </nav>
-    <nav class="sidebar"><a class="sidebar-logo" href="../../../os/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div>
-        </a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../os/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><div class="theme-picker hidden"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu" title="themes"><img width="22" height="22" alt="Pick another theme!" src="../../../brush.svg"></button><div id="theme-choices" role="menu"></div></div><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><button type="button" id="help-button" title="help">?</button><a id="settings-menu" href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/trap/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../os/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../os/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../os/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
 <span id="2">2</span>
 <span id="3">3</span>
 <span id="4">4</span>
@@ -172,6 +167,26 @@
 <span id="167">167</span>
 <span id="168">168</span>
 <span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
 </pre><pre class="rust"><code><span class="kw">mod</span> <span class="ident">context</span>;
 
 <span class="kw">use</span> <span class="ident"><span class="kw">crate</span>::config::TRAMPOLINE</span>;
@@ -185,7 +200,7 @@
 <span class="kw">use</span> <span class="ident">riscv::register</span>::{
     <span class="ident">mtvec::TrapMode</span>,
     <span class="ident">scause</span>::{<span class="self">self</span>, <span class="ident">Exception</span>, <span class="ident">Interrupt</span>, <span class="ident">Trap</span>},
-    <span class="ident">sie</span>, <span class="ident">sscratch</span>, <span class="ident">sstatus</span>, <span class="ident">stval</span>, <span class="ident">stvec</span>,
+    <span class="ident">sie</span>, <span class="ident">sscratch</span>, <span class="ident">sstatus</span>, <span class="ident">stval</span>, <span class="ident">stvec</span>,<span class="ident">sip</span>
 };
 
 <span class="macro">global_asm!</span>(<span class="macro">include_str!</span>(<span class="string">&quot;trap.S&quot;</span>));
@@ -235,7 +250,7 @@
     <span class="ident">set_kernel_trap_entry</span>();
     <span class="kw">let</span> <span class="ident">scause</span> <span class="op">=</span> <span class="ident">scause::read</span>();
     <span class="kw">let</span> <span class="ident">stval</span> <span class="op">=</span> <span class="ident">stval::read</span>();
-    <span class="comment">//println!(&quot;into {:?}&quot;, scause.cause());</span>
+    <span class="comment">// println!(&quot;into {:?}&quot;, scause.cause());</span>
     <span class="kw">match</span> <span class="ident">scause</span>.<span class="ident">cause</span>() {
         <span class="ident">Trap::Exception</span>(<span class="ident">Exception::UserEnvCall</span>) =&gt; {
             <span class="comment">// jump to next instruction anyway</span>
@@ -269,10 +284,20 @@
         <span class="ident">Trap::Exception</span>(<span class="ident">Exception::IllegalInstruction</span>) =&gt; {
             <span class="ident">current_add_signal</span>(<span class="ident">SignalFlags::SIGILL</span>);
         }
-        <span class="ident">Trap::Interrupt</span>(<span class="ident">Interrupt::SupervisorTimer</span>) =&gt; {
-            <span class="ident">set_next_trigger</span>();
+        <span class="comment">// Trap::Interrupt(Interrupt::SupervisorTimer) =&gt; {</span>
+        <span class="comment">//     set_next_trigger();</span>
+        <span class="comment">//     check_timer();</span>
+        <span class="comment">//     suspend_current_and_run_next();</span>
+        <span class="comment">// }</span>
+        <span class="ident">Trap::Interrupt</span>(<span class="ident">Interrupt::SupervisorSoft</span>) =&gt; {
+            <span class="comment">//set_next_trigger();</span>
+            <span class="kw">const</span> <span class="ident">SSIP</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
+            <span class="kw">unsafe</span> {
+                <span class="macro">asm!</span>(<span class="string">&quot;csrc sip, {}&quot;</span>, <span class="kw">in</span>(<span class="ident">reg</span>) <span class="ident">SSIP</span>);
+            }
+            <span class="comment">//println!(&quot;TRAP: ssoft in Kern&quot;);</span>
             <span class="ident">check_timer</span>();
-            <span class="ident">suspend_current_and_run_next</span>();
+            <span class="comment">// do not schedule now</span>
         }
         <span class="ident">Trap::Interrupt</span>(<span class="ident">Interrupt::SupervisorExternal</span>) =&gt; {
             <span class="ident"><span class="kw">crate</span>::board::irq_handler</span>();
@@ -325,8 +350,18 @@
         <span class="ident">Trap::Interrupt</span>(<span class="ident">Interrupt::SupervisorExternal</span>) =&gt; {
             <span class="ident"><span class="kw">crate</span>::board::irq_handler</span>();
         }
-        <span class="ident">Trap::Interrupt</span>(<span class="ident">Interrupt::SupervisorTimer</span>) =&gt; {
-            <span class="ident">set_next_trigger</span>();
+        <span class="comment">// Trap::Interrupt(Interrupt::SupervisorTimer) =&gt; {</span>
+        <span class="comment">//     //set_next_trigger();</span>
+        <span class="comment">//     check_timer();</span>
+        <span class="comment">//     // do not schedule now</span>
+        <span class="comment">// }</span>
+        <span class="ident">Trap::Interrupt</span>(<span class="ident">Interrupt::SupervisorSoft</span>) =&gt; {
+            <span class="comment">//set_next_trigger();</span>
+            <span class="kw">const</span> <span class="ident">SSIP</span>: <span class="ident">usize</span> <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">1</span>;
+            <span class="kw">unsafe</span> {
+                <span class="macro">asm!</span>(<span class="string">&quot;csrc sip, {}&quot;</span>, <span class="kw">in</span>(<span class="ident">reg</span>) <span class="ident">SSIP</span>);
+            }
+            <span class="comment">//println!(&quot;TRAP: ssoft in Kern&quot;);</span>
             <span class="ident">check_timer</span>();
             <span class="comment">// do not schedule now</span>
         }
@@ -342,5 +377,4 @@
 
 <span class="kw">pub</span> <span class="kw">use</span> <span class="ident">context::TrapContext</span>;
 </code></pre></div>
-</section><section id="search" class="content hidden"></section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="os" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.62.0-nightly (1f7fb6413 2022-04-10)" ></div>
-</body></html>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="os" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f6f9d5e73 2022-08-04)" ></div></body></html>
