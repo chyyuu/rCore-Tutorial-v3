@@ -4,11 +4,49 @@ use super::PageTableEntry;
 use crate::config::{PAGE_SIZE, PAGE_SIZE_BITS};
 use core::fmt::{self, Debug, Formatter};
 
-/// physical address
+// RV64: SV39 paging mode
+#[cfg(target_pointer_width = "64")]
 const PA_WIDTH_SV39: usize = 56;
+#[cfg(target_pointer_width = "64")]
 const VA_WIDTH_SV39: usize = 39;
+#[cfg(target_pointer_width = "64")]
 const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;
+#[cfg(target_pointer_width = "64")]
 const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
+
+// RV32: SV32 paging mode
+#[cfg(target_pointer_width = "32")]
+const PA_WIDTH_SV32: usize = 34;
+#[cfg(target_pointer_width = "32")]
+const VA_WIDTH_SV32: usize = 32;
+#[cfg(target_pointer_width = "32")]
+const PPN_WIDTH_SV32: usize = PA_WIDTH_SV32 - PAGE_SIZE_BITS;
+#[cfg(target_pointer_width = "32")]
+const VPN_WIDTH_SV32: usize = VA_WIDTH_SV32 - PAGE_SIZE_BITS;
+
+/// Get PA width based on architecture
+#[cfg(target_pointer_width = "64")]
+const PA_WIDTH: usize = PA_WIDTH_SV39;
+#[cfg(target_pointer_width = "32")]
+const PA_WIDTH: usize = PA_WIDTH_SV32;
+
+/// Get VA width based on architecture
+#[cfg(target_pointer_width = "64")]
+const VA_WIDTH: usize = VA_WIDTH_SV39;
+#[cfg(target_pointer_width = "32")]
+const VA_WIDTH: usize = VA_WIDTH_SV32;
+
+/// Get PPN width based on architecture
+#[cfg(target_pointer_width = "64")]
+const PPN_WIDTH: usize = PPN_WIDTH_SV39;
+#[cfg(target_pointer_width = "32")]
+const PPN_WIDTH: usize = PPN_WIDTH_SV32;
+
+/// Get VPN width based on architecture
+#[cfg(target_pointer_width = "64")]
+const VPN_WIDTH: usize = VPN_WIDTH_SV39;
+#[cfg(target_pointer_width = "32")]
+const VPN_WIDTH: usize = VPN_WIDTH_SV32;
 
 /// Definitions
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -55,22 +93,22 @@ impl Debug for PhysPageNum {
 
 impl From<usize> for PhysAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PA_WIDTH_SV39) - 1))
+        Self(v & ((1 << PA_WIDTH) - 1))
     }
 }
 impl From<usize> for PhysPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PPN_WIDTH_SV39) - 1))
+        Self(v & ((1 << PPN_WIDTH) - 1))
     }
 }
 impl From<usize> for VirtAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VA_WIDTH_SV39) - 1))
+        Self(v & ((1 << VA_WIDTH) - 1))
     }
 }
 impl From<usize> for VirtPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VPN_WIDTH_SV39) - 1))
+        Self(v & ((1 << VPN_WIDTH) - 1))
     }
 }
 impl From<PhysAddr> for usize {
@@ -85,9 +123,16 @@ impl From<PhysPageNum> for usize {
 }
 impl From<VirtAddr> for usize {
     fn from(v: VirtAddr) -> Self {
-        if v.0 >= (1 << (VA_WIDTH_SV39 - 1)) {
-            v.0 | (!((1 << VA_WIDTH_SV39) - 1))
-        } else {
+        #[cfg(target_pointer_width = "64")]
+        {
+            if v.0 >= (1 << (VA_WIDTH - 1)) {
+                v.0 | (!((1 << VA_WIDTH) - 1))
+            } else {
+                v.0
+            }
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
             v.0
         }
     }
@@ -150,6 +195,10 @@ impl From<PhysPageNum> for PhysAddr {
 }
 
 impl VirtPageNum {
+    /// Get VPN indexes for page table walk
+    /// RV64 SV39: 3-level page table, each level 9 bits
+    /// RV32 SV32: 2-level page table, each level 10 bits
+    #[cfg(target_pointer_width = "64")]
     pub fn indexes(&self) -> [usize; 3] {
         let mut vpn = self.0;
         let mut idx = [0usize; 3];
@@ -159,12 +208,29 @@ impl VirtPageNum {
         }
         idx
     }
+    
+    #[cfg(target_pointer_width = "32")]
+    pub fn indexes(&self) -> [usize; 2] {
+        let mut vpn = self.0;
+        let mut idx = [0usize; 2];
+        for i in (0..2).rev() {
+            idx[i] = vpn & 1023;
+            vpn >>= 10;
+        }
+        idx
+    }
 }
+
+/// Number of PTEs per page
+#[cfg(target_pointer_width = "64")]
+pub const PTES_PER_PAGE: usize = 512;
+#[cfg(target_pointer_width = "32")]
+pub const PTES_PER_PAGE: usize = 1024;
 
 impl PhysPageNum {
     pub fn get_pte_array(&self) -> &'static mut [PageTableEntry] {
         let pa: PhysAddr = (*self).into();
-        unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut PageTableEntry, 512) }
+        unsafe { core::slice::from_raw_parts_mut(pa.0 as *mut PageTableEntry, PTES_PER_PAGE) }
     }
     pub fn get_bytes_array(&self) -> &'static mut [u8] {
         let pa: PhysAddr = (*self).into();

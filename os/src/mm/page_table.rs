@@ -26,17 +26,29 @@ pub struct PageTableEntry {
     pub bits: usize,
 }
 
+/// PPN shift in PTE
+#[cfg(target_pointer_width = "64")]
+const PPN_SHIFT: usize = 10;
+#[cfg(target_pointer_width = "32")]
+const PPN_SHIFT: usize = 10;
+
+/// PPN mask width
+#[cfg(target_pointer_width = "64")]
+const PPN_MASK_WIDTH: usize = 44;
+#[cfg(target_pointer_width = "32")]
+const PPN_MASK_WIDTH: usize = 22;
+
 impl PageTableEntry {
     pub fn new(ppn: PhysPageNum, flags: PTEFlags) -> Self {
         PageTableEntry {
-            bits: ppn.0 << 10 | flags.bits as usize,
+            bits: ppn.0 << PPN_SHIFT | flags.bits as usize,
         }
     }
     pub fn empty() -> Self {
         PageTableEntry { bits: 0 }
     }
     pub fn ppn(&self) -> PhysPageNum {
-        (self.bits >> 10 & ((1usize << 44) - 1)).into()
+        (self.bits >> PPN_SHIFT & ((1usize << PPN_MASK_WIDTH) - 1)).into()
     }
     pub fn flags(&self) -> PTEFlags {
         PTEFlags::from_bits(self.bits as u8).unwrap()
@@ -55,6 +67,14 @@ impl PageTableEntry {
     }
 }
 
+/// Number of page table levels
+#[cfg(target_pointer_width = "64")]
+#[allow(dead_code)]
+const PAGE_TABLE_LEVELS: usize = 3;
+#[cfg(target_pointer_width = "32")]
+#[allow(dead_code)]
+const PAGE_TABLE_LEVELS: usize = 2;
+
 /// page table structure
 pub struct PageTable {
     root_ppn: PhysPageNum,
@@ -72,11 +92,17 @@ impl PageTable {
     }
     /// Temporarily used to get arguments from user space.
     pub fn from_token(satp: usize) -> Self {
+        #[cfg(target_pointer_width = "64")]
+        let ppn = PhysPageNum::from(satp & ((1usize << 44) - 1));
+        #[cfg(target_pointer_width = "32")]
+        let ppn = PhysPageNum::from(satp & ((1usize << 22) - 1));
         Self {
-            root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
+            root_ppn: ppn,
             frames: Vec::new(),
         }
     }
+    
+    #[cfg(target_pointer_width = "64")]
     fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
@@ -96,6 +122,29 @@ impl PageTable {
         }
         result
     }
+    
+    #[cfg(target_pointer_width = "32")]
+    fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[*idx];
+            if i == 1 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                let frame = frame_alloc().unwrap();
+                *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
+                self.frames.push(frame);
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+    
+    #[cfg(target_pointer_width = "64")]
     fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
@@ -113,6 +162,26 @@ impl PageTable {
         }
         result
     }
+    
+    #[cfg(target_pointer_width = "32")]
+    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[*idx];
+            if i == 1 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                return None;
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+    
     #[allow(unused)]
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).unwrap();
@@ -129,7 +198,14 @@ impl PageTable {
         self.find_pte(vpn).map(|pte| *pte)
     }
     pub fn token(&self) -> usize {
-        8usize << 60 | self.root_ppn.0
+        #[cfg(target_pointer_width = "64")]
+        {
+            8usize << 60 | self.root_ppn.0
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            1usize << 31 | self.root_ppn.0
+        }
     }
 }
 

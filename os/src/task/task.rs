@@ -10,6 +10,7 @@ pub struct TaskControlBlock {
     pub task_cx: TaskContext,
     pub memory_set: MemorySet,
     pub trap_cx_ppn: PhysPageNum,
+    #[allow(dead_code)]
     pub base_size: usize,
 }
 

@@ -1,52 +1,65 @@
 //! SBI call wrappers
+//!
+//! Supports both RustSBI (external) and nobios (built-in M-Mode SBI) modes
 
 use core::arch::asm;
 
-const SBI_SET_TIMER: usize = 0;
-const SBI_CONSOLE_PUTCHAR: usize = 1;
-
-// const SBI_CONSOLE_GETCHAR: usize = 2;
-// const SBI_CLEAR_IPI: usize = 3;
-// const SBI_SEND_IPI: usize = 4;
-// const SBI_REMOTE_FENCE_I: usize = 5;
-// const SBI_REMOTE_SFENCE_VMA: usize = 6;
-// const SBI_REMOTE_SFENCE_VMA_ASID: usize = 7;
-// const SBI_SHUTDOWN: usize = 8;
-
+/// SBI call implementation using ecall
 #[inline(always)]
-/// general sbi call
-fn sbi_call(which: usize, arg0: usize, arg1: usize, arg2: usize) -> usize {
-    let mut ret;
+fn sbi_call(eid: usize, fid: usize, arg0: usize, arg1: usize, arg2: usize) -> (isize, usize) {
+    let error;
+    let value;
     unsafe {
         asm!(
-            "li x16, 0",
             "ecall",
-            inlateout("x10") arg0 => ret,
-            in("x11") arg1,
-            in("x12") arg2,
-            in("x17") which,
+            inlateout("a0") arg0 => error,
+            inlateout("a1") arg1 => value,
+            in("a2") arg2,
+            in("a6") fid,
+            in("a7") eid,
         );
     }
-    ret
+    (error, value)
 }
 
 /// use sbi call to set timer
 pub fn set_timer(timer: usize) {
-    sbi_call(SBI_SET_TIMER, timer, 0, 0);
+    // Timer extension (0x54494D45)
+    // RV32: timer is already usize (32-bit), high bits are 0
+    // RV64: timer is usize (64-bit)
+    #[cfg(target_pointer_width = "64")]
+    {
+        sbi_call(0x54494D45, 0, timer, 0, 0);
+    }
+    #[cfg(target_pointer_width = "32")]
+    {
+        // For RV32, SBI timer extension expects 64-bit time in a0:a1
+        // Since we only have 32-bit timer, high part is 0
+        sbi_call(0x54494D45, 0, timer, 0, 0);
+    }
 }
 
 /// use sbi call to putchar in console (qemu uart handler)
 pub fn console_putchar(c: usize) {
-    sbi_call(SBI_CONSOLE_PUTCHAR, c, 0, 0);
+    sbi_call(0x01, 0, c, 0, 0);
 }
 
 /// use sbi call to getchar from console (qemu uart handler)
-// pub fn console_getchar() -> usize {
-//     sbi_call(SBI_CONSOLE_GETCHAR, 0, 0, 0)
-// }
+#[allow(unused)]
+pub fn console_getchar() -> usize {
+    let (_, value) = sbi_call(0x02, 0, 0, 0, 0);
+    value
+}
 
 use crate::board::QEMUExit;
 /// use sbi call to shutdown the kernel
-pub fn shutdown() -> ! {
+pub fn shutdown(failure: bool) -> ! {
+    // Use SRST extension (0x53525354) for system reset
+    const SRST_EID: usize = 0x53525354;
+    const SRST_SHUTDOWN: usize = 0;
+    let reason = if failure { 1 } else { 0 };
+    sbi_call(SRST_EID, SRST_SHUTDOWN, 0, reason, 0);
+    
+    // Fallback to QEMU exit
     crate::board::QEMU_EXIT_HANDLE.exit_failure();
 }
