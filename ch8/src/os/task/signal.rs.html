@@ -1,60 +1,29 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/task/signal.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>signal.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../../storage.js"></script><script defer src="../../../source-script.js"></script><script defer src="../../../source-files.js"></script><script defer src="../../../main.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../../os/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../../os/index.html"><div class="logo-container"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../../os/index.html"><img class="rust-logo" src="../../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
-<span id="2">2</span>
-<span id="3">3</span>
-<span id="4">4</span>
-<span id="5">5</span>
-<span id="6">6</span>
-<span id="7">7</span>
-<span id="8">8</span>
-<span id="9">9</span>
-<span id="10">10</span>
-<span id="11">11</span>
-<span id="12">12</span>
-<span id="13">13</span>
-<span id="14">14</span>
-<span id="15">15</span>
-<span id="16">16</span>
-<span id="17">17</span>
-<span id="18">18</span>
-<span id="19">19</span>
-<span id="20">20</span>
-<span id="21">21</span>
-<span id="22">22</span>
-<span id="23">23</span>
-<span id="24">24</span>
-<span id="25">25</span>
-<span id="26">26</span>
-<span id="27">27</span>
-<span id="28">28</span>
-<span id="29">29</span>
-</pre><pre class="rust"><code><span class="kw">use</span> <span class="ident">bitflags</span>::<span class="kw-2">*</span>;
-
-<span class="macro">bitflags!</span> {
-    <span class="kw">pub</span> <span class="kw">struct</span> <span class="ident">SignalFlags</span>: <span class="ident">u32</span> {
-        <span class="kw">const</span> <span class="ident">SIGINT</span>    <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">2</span>;
-        <span class="kw">const</span> <span class="ident">SIGILL</span>    <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">4</span>;
-        <span class="kw">const</span> <span class="ident">SIGABRT</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">6</span>;
-        <span class="kw">const</span> <span class="ident">SIGFPE</span>    <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">8</span>;
-        <span class="kw">const</span> <span class="ident">SIGSEGV</span>   <span class="op">=</span> <span class="number">1</span> <span class="op">&lt;</span><span class="op">&lt;</span> <span class="number">11</span>;
-    }
-}
-
-<span class="kw">impl</span> <span class="ident">SignalFlags</span> {
-    <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">check_error</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span><span class="op">&lt;</span>(<span class="ident">i32</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static</span> <span class="ident">str</span>)<span class="op">&gt;</span> {
-        <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident"><span class="self">Self</span>::SIGINT</span>) {
-            <span class="prelude-val">Some</span>((<span class="op">-</span><span class="number">2</span>, <span class="string">&quot;Killed, SIGINT=2&quot;</span>))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident"><span class="self">Self</span>::SIGILL</span>) {
-            <span class="prelude-val">Some</span>((<span class="op">-</span><span class="number">4</span>, <span class="string">&quot;Illegal Instruction, SIGILL=4&quot;</span>))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident"><span class="self">Self</span>::SIGABRT</span>) {
-            <span class="prelude-val">Some</span>((<span class="op">-</span><span class="number">6</span>, <span class="string">&quot;Aborted, SIGABRT=6&quot;</span>))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident"><span class="self">Self</span>::SIGFPE</span>) {
-            <span class="prelude-val">Some</span>((<span class="op">-</span><span class="number">8</span>, <span class="string">&quot;Erroneous Arithmetic Operation, SIGFPE=8&quot;</span>))
-        } <span class="kw">else</span> <span class="kw">if</span> <span class="self">self</span>.<span class="ident">contains</span>(<span class="ident"><span class="self">Self</span>::SIGSEGV</span>) {
-            <span class="prelude-val">Some</span>((<span class="op">-</span><span class="number">11</span>, <span class="string">&quot;Segmentation Fault, SIGSEGV=11&quot;</span>))
-        } <span class="kw">else</span> {
-            <span class="prelude-val">None</span>
-        }
-    }
-}
-</code></pre></div>
-</section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="os" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.64.0-nightly (f6f9d5e73 2022-08-04)" ></div></body></html>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/task/signal.rs`."><title>signal.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="os" data-themes="" data-resource-suffix="" data-rustdoc-version="1.87.0-nightly (ce36a966c 2025-02-17)" data-channel="nightly" data-search-js="search-f7327375.js" data-settings-js="settings-6dad6058.js" ><script src="../../../static.files/storage-3a5871a4.js"></script><script defer src="../../../static.files/src-script-b8d3f215.js"></script><script defer src="../../../src-files.js"></script><script defer src="../../../static.files/main-5332ae0c.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">os/task/</div>signal.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-2"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="kw">use </span>bitflags::<span class="kw-2">*</span>;
+<a href=#2 id=2 data-nosnippet>2</a>
+<a href=#3 id=3 data-nosnippet>3</a><span class="macro">bitflags!</span> {
+<a href=#4 id=4 data-nosnippet>4</a>    <span class="kw">pub struct </span>SignalFlags: u32 {
+<a href=#5 id=5 data-nosnippet>5</a>        <span class="kw">const </span>SIGINT    = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>;
+<a href=#6 id=6 data-nosnippet>6</a>        <span class="kw">const </span>SIGILL    = <span class="number">1 </span>&lt;&lt; <span class="number">4</span>;
+<a href=#7 id=7 data-nosnippet>7</a>        <span class="kw">const </span>SIGABRT   = <span class="number">1 </span>&lt;&lt; <span class="number">6</span>;
+<a href=#8 id=8 data-nosnippet>8</a>        <span class="kw">const </span>SIGFPE    = <span class="number">1 </span>&lt;&lt; <span class="number">8</span>;
+<a href=#9 id=9 data-nosnippet>9</a>        <span class="kw">const </span>SIGSEGV   = <span class="number">1 </span>&lt;&lt; <span class="number">11</span>;
+<a href=#10 id=10 data-nosnippet>10</a>    }
+<a href=#11 id=11 data-nosnippet>11</a>}
+<a href=#12 id=12 data-nosnippet>12</a>
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">impl </span>SignalFlags {
+<a href=#14 id=14 data-nosnippet>14</a>    <span class="kw">pub fn </span>check_error(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(i32, <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str)&gt; {
+<a href=#15 id=15 data-nosnippet>15</a>        <span class="kw">if </span><span class="self">self</span>.contains(<span class="self">Self</span>::SIGINT) {
+<a href=#16 id=16 data-nosnippet>16</a>            <span class="prelude-val">Some</span>((-<span class="number">2</span>, <span class="string">"Killed, SIGINT=2"</span>))
+<a href=#17 id=17 data-nosnippet>17</a>        } <span class="kw">else if </span><span class="self">self</span>.contains(<span class="self">Self</span>::SIGILL) {
+<a href=#18 id=18 data-nosnippet>18</a>            <span class="prelude-val">Some</span>((-<span class="number">4</span>, <span class="string">"Illegal Instruction, SIGILL=4"</span>))
+<a href=#19 id=19 data-nosnippet>19</a>        } <span class="kw">else if </span><span class="self">self</span>.contains(<span class="self">Self</span>::SIGABRT) {
+<a href=#20 id=20 data-nosnippet>20</a>            <span class="prelude-val">Some</span>((-<span class="number">6</span>, <span class="string">"Aborted, SIGABRT=6"</span>))
+<a href=#21 id=21 data-nosnippet>21</a>        } <span class="kw">else if </span><span class="self">self</span>.contains(<span class="self">Self</span>::SIGFPE) {
+<a href=#22 id=22 data-nosnippet>22</a>            <span class="prelude-val">Some</span>((-<span class="number">8</span>, <span class="string">"Erroneous Arithmetic Operation, SIGFPE=8"</span>))
+<a href=#23 id=23 data-nosnippet>23</a>        } <span class="kw">else if </span><span class="self">self</span>.contains(<span class="self">Self</span>::SIGSEGV) {
+<a href=#24 id=24 data-nosnippet>24</a>            <span class="prelude-val">Some</span>((-<span class="number">11</span>, <span class="string">"Segmentation Fault, SIGSEGV=11"</span>))
+<a href=#25 id=25 data-nosnippet>25</a>        } <span class="kw">else </span>{
+<a href=#26 id=26 data-nosnippet>26</a>            <span class="prelude-val">None
+<a href=#27 id=27 data-nosnippet>27</a>        </span>}
+<a href=#28 id=28 data-nosnippet>28</a>    }
+<a href=#29 id=29 data-nosnippet>29</a>}</code></pre></div></section></main></body></html>
