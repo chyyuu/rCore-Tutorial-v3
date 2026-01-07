@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["RING_BUFFER_SIZE"],"enum":["RingBufferStatus"],"fn":["make_pipe"],"struct":["Pipe","PipeRingBuffer"]};

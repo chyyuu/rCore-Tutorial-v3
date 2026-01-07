@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["sys_gettid","sys_thread_create","sys_waittid"]};
