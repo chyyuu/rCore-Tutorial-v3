@@ -1,8 +1,14 @@
 pub const CLOCK_FREQ: usize = 12500000;
-pub const MEMORY_END: usize = 0x801000000;
 
+#[cfg(target_pointer_width = "64")]
+pub const MEMORY_END: usize = 0x801000000;
+#[cfg(target_pointer_width = "32")]
+pub const MEMORY_END: usize = 0x81000000;
+
+/// MMIO regions
 pub const MMIO: &[(usize, usize)] = &[
-    (0x0010_0000, 0x00_2000), // VIRT_TEST/RTC  in virt machine
+    (0x1000_0000, 0x1000), // UART16550 in virt machine
+    (0x0010_0000, 0x00_2000), // VIRT_TEST/RTC in virt machine
     (0x1000_1000, 0x00_1000), // Virtio Block in virt machine
 ];
 
@@ -29,7 +35,11 @@ pub trait QEMUExit {
     fn exit_success(&self) -> !;
 
     /// Exit QEMU using `EXIT_FAILURE`, aka `1`.
+    #[allow(dead_code)]
     fn exit_failure(&self) -> !;
+
+    /// Reset QEMU using `EXIT_RESET`.
+    fn exit_reset(&self) -> !;
 }
 
 /// RISCV64 configuration
@@ -58,11 +68,12 @@ impl QEMUExit for RISCV64 {
             EXIT_SUCCESS | EXIT_FAILURE | EXIT_RESET => code,
             _ => exit_code_encode(code),
         };
-
+        
+        let addr = self.addr as usize;
         unsafe {
             asm!(
                 "sw {0}, 0({1})",
-                in(reg)code_new, in(reg)self.addr
+                in(reg)code_new, in(reg)addr
             );
 
             // For the case that the QEMU exit attempt did not work, transition into an infinite
@@ -82,8 +93,13 @@ impl QEMUExit for RISCV64 {
     fn exit_failure(&self) -> ! {
         self.exit(EXIT_FAILURE);
     }
+
+    fn exit_reset(&self) -> ! {
+        self.exit(EXIT_RESET);
+    }
 }
 
 const VIRT_TEST: u64 = 0x100000;
 
+/// QEMU exit handle
 pub const QEMU_EXIT_HANDLE: RISCV64 = RISCV64::new(VIRT_TEST);

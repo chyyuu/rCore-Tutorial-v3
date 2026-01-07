@@ -22,9 +22,11 @@ impl TrapContext {
         kernel_sp: usize,
         trap_handler: usize,
     ) -> Self {
-        let mut sstatus = sstatus::read();
+        let sstatus = sstatus::read();
         // set CPU privilege to User after trapping back
-        sstatus.set_spp(SPP::User);
+        unsafe {
+            sstatus::set_spp(SPP::User);
+        }
         let mut cx = Self {
             x: [0; 32],
             sstatus,

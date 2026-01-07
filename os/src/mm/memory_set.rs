@@ -45,6 +45,7 @@ impl MemorySet {
             areas: Vec::new(),
         }
     }
+    /// Get SATP token
     pub fn token(&self) -> usize {
         self.page_table.token()
     }

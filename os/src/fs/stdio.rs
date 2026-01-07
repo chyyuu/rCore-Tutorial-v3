@@ -1,11 +1,33 @@
+//!Stdin & Stdout
 use super::File;
 use crate::mm::UserBuffer;
-use crate::sbi::console_getchar;
 use crate::task::suspend_current_and_run_next;
 
+///Standard input
 pub struct Stdin;
-
+///Standard output
 pub struct Stdout;
+
+/// Read a character from console
+/// In nobios mode, directly access UART hardware
+/// Otherwise, use SBI call
+fn console_getchar() -> Option<u8> {
+    #[cfg(feature = "nobios")]
+    {
+        use crate::drivers::uart;
+        uart::getchar()
+    }
+    #[cfg(not(feature = "nobios"))]
+    {
+        use crate::sbi;
+        let c = sbi::console_getchar();
+        if c == 0 || c == usize::MAX {
+            None
+        } else {
+            Some(c as u8)
+        }
+    }
+}
 
 impl File for Stdin {
     fn readable(&self) -> bool {
@@ -17,17 +39,15 @@ impl File for Stdin {
     fn read(&self, mut user_buf: UserBuffer) -> usize {
         assert_eq!(user_buf.len(), 1);
         // busy loop
-        let mut c: usize;
+        let ch: u8;
         loop {
-            c = console_getchar();
-            if c == 0 {
-                suspend_current_and_run_next();
-                continue;
-            } else {
+            if let Some(c) = console_getchar() {
+                ch = c;
                 break;
+            } else {
+                suspend_current_and_run_next();
             }
         }
-        let ch = c as u8;
         unsafe {
             user_buf.buffers[0].as_mut_ptr().write_volatile(ch);
         }
