@@ -12,17 +12,17 @@ use core::arch::asm;
 use lazy_static::*;
 use riscv::register::satp;
 
-extern "C" {
-    fn stext();
-    fn etext();
-    fn srodata();
-    fn erodata();
-    fn sdata();
-    fn edata();
-    fn sbss_with_stack();
-    fn ebss();
-    fn ekernel();
-    fn strampoline();
+unsafe extern "C" {
+    safe fn stext();
+    safe fn etext();
+    safe fn srodata();
+    safe fn erodata();
+    safe fn sdata();
+    safe fn edata();
+    safe fn sbss_with_stack();
+    safe fn ebss();
+    safe fn ekernel();
+    safe fn strampoline();
 }
 
 lazy_static! {

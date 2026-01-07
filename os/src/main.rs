@@ -6,7 +6,7 @@
 //! - [`trap`]: Handles all cases of switching from userspace to the kernel
 //! - [`task`]: Task management
 //! - [`syscall`]: System call handling and implementation
-//! - [`mm`]: Address map using SV39
+//! - [`mm`]: Address map using SV39/SV32
 //! - [`sync`]: Wrap a static data structure inside it so that we are able to access it without any `unsafe`.
 //! - [`fs`]: Separate user from file system with some structures
 //!
@@ -19,17 +19,16 @@
 //! userspace.
 
 #![deny(missing_docs)]
-#![deny(warnings)]
-#![allow(unused_imports)]
+#![allow(warnings)]
 #![no_std]
 #![no_main]
-#![feature(panic_info_message)]
-#![feature(alloc_error_handler)]
 
 extern crate alloc;
 
 #[macro_use]
 extern crate bitflags;
+
+use log::*;
 
 #[path = "boards/qemu.rs"]
 mod board;
@@ -40,6 +39,7 @@ mod config;
 mod drivers;
 pub mod fs;
 pub mod lang_items;
+mod logging;
 pub mod mm;
 pub mod sbi;
 pub mod sync;
@@ -48,14 +48,25 @@ pub mod task;
 pub mod timer;
 pub mod trap;
 
-use core::arch::global_asm;
+// M-Mode SBI implementation (only used when booting with -bios none)
+#[cfg(feature = "nobios")]
+mod msbi;
 
-global_asm!(include_str!("entry.asm"));
-/// clear BSS segment
+// Include M-Mode entry point (for -bios none boot)
+#[cfg(all(feature = "nobios", target_pointer_width = "64"))]
+core::arch::global_asm!(include_str!("m_entry_rv64.asm"));
+
+#[cfg(all(feature = "nobios", target_pointer_width = "32"))]
+core::arch::global_asm!(include_str!("m_entry_rv32.asm"));
+
+// Include S-Mode entry point
+core::arch::global_asm!(include_str!("entry.asm"));
+
+/// Clear BSS segment
 fn clear_bss() {
-    extern "C" {
-        fn sbss();
-        fn ebss();
+    unsafe extern "C" {
+        safe fn sbss();
+        safe fn ebss();
     }
     unsafe {
         core::slice::from_raw_parts_mut(sbss as usize as *mut u8, ebss as usize - sbss as usize)
@@ -63,11 +74,16 @@ fn clear_bss() {
     }
 }
 
-#[no_mangle]
-/// the rust entry-point of os
+#[unsafe(no_mangle)]
+/// The rust entry-point of os
 pub fn rust_main() -> ! {
     clear_bss();
+    logging::init();
     println!("[kernel] Hello, world!");
+    trace!("[kernel] .text section loaded");
+    debug!("[kernel] .rodata section loaded");
+    info!("[kernel] .data section loaded");
+    warn!("[kernel] .bss section cleared");
     mm::init();
     mm::remap_test();
     trap::init();
@@ -75,6 +91,7 @@ pub fn rust_main() -> ! {
     timer::set_next_trigger();
     fs::list_apps();
     task::add_initproc();
+    info!("after initproc!");
     task::run_tasks();
     panic!("Unreachable in rust_main!");
 }

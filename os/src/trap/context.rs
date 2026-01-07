@@ -3,7 +3,7 @@ use riscv::register::sstatus::{self, Sstatus, SPP};
 
 #[repr(C)]
 #[derive(Debug)]
-///trap context structure containing sstatus, sepc and registers
+/// trap context structure containing sstatus, sepc and registers
 pub struct TrapContext {
     /// general regs[0..31]
     pub x: [usize; 32],
@@ -20,11 +20,11 @@ pub struct TrapContext {
 }
 
 impl TrapContext {
-    ///set stack pointer to x_2 reg (sp)
+    /// set stack pointer to x_2 reg (sp)
     pub fn set_sp(&mut self, sp: usize) {
         self.x[2] = sp;
     }
-    ///init app context
+    /// init app context
     pub fn app_init_context(
         entry: usize,
         sp: usize,
@@ -32,9 +32,11 @@ impl TrapContext {
         kernel_sp: usize,
         trap_handler: usize,
     ) -> Self {
-        let mut sstatus = sstatus::read();
+        let sstatus = sstatus::read();
         // set CPU privilege to User after trapping back
-        sstatus.set_spp(SPP::User);
+        unsafe {
+            sstatus::set_spp(SPP::User);
+        }
         let mut cx = Self {
             x: [0; 32],
             sstatus,

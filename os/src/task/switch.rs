@@ -1,9 +1,15 @@
-//!Wrap `switch.S` as a function
+//! Wrap `switch.S` as a function
+
 use super::TaskContext;
 use core::arch::global_asm;
 
-global_asm!(include_str!("switch.S"));
+// Include architecture-specific switch assembly
+#[cfg(target_pointer_width = "64")]
+global_asm!(include_str!("switch_rv64.S"));
+#[cfg(target_pointer_width = "32")]
+global_asm!(include_str!("switch_rv32.S"));
 
 extern "C" {
+    /// Switch context between two tasks
     pub fn __switch(current_task_cx_ptr: *mut TaskContext, next_task_cx_ptr: *const TaskContext);
 }

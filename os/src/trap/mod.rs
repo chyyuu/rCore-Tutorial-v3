@@ -11,6 +11,7 @@
 //! It then calls different functionality based on what exactly the exception
 //! was. For example, timer interrupts trigger task preemption, and syscalls go
 //! to [`syscall()`].
+
 mod context;
 
 use crate::config::{TRAMPOLINE, TRAP_CONTEXT};
@@ -22,12 +23,17 @@ use crate::timer::set_next_trigger;
 use core::arch::{asm, global_asm};
 use riscv::register::{
     mtvec::TrapMode,
-    scause::{self, Exception, Interrupt, Trap},
+    scause::{self, Trap},
     sie, stval, stvec,
 };
 
-global_asm!(include_str!("trap.S"));
-/// initialize CSR `stvec` as the entry of `__alltraps`
+// Include architecture-specific trap assembly
+#[cfg(target_pointer_width = "64")]
+global_asm!(include_str!("trap_rv64.S"));
+#[cfg(target_pointer_width = "32")]
+global_asm!(include_str!("trap_rv32.S"));
+
+/// Initialize CSR `stvec` as the entry of `__alltraps`
 pub fn init() {
     set_kernel_trap_entry();
 }
@@ -43,68 +49,97 @@ fn set_user_trap_entry() {
         stvec::write(TRAMPOLINE as usize, TrapMode::Direct);
     }
 }
-/// enable timer interrupt in sie CSR
+
+/// Enable timer interrupt in sie CSR
 pub fn enable_timer_interrupt() {
     unsafe {
         sie::set_stimer();
     }
 }
 
+// Exception codes
+const EXCEPTION_USER_ECALL: usize = 8;
+const EXCEPTION_STORE_FAULT: usize = 7;
+const EXCEPTION_STORE_PAGE_FAULT: usize = 15;
+const EXCEPTION_INSTRUCTION_FAULT: usize = 1;
+const EXCEPTION_INSTRUCTION_PAGE_FAULT: usize = 12;
+const EXCEPTION_LOAD_FAULT: usize = 5;
+const EXCEPTION_LOAD_PAGE_FAULT: usize = 13;
+const EXCEPTION_ILLEGAL_INSTRUCTION: usize = 2;
+
+// Interrupt codes
+const INTERRUPT_SUPERVISOR_TIMER: usize = 5;
+
 #[no_mangle]
-/// handle an interrupt, exception, or system call from user space
+/// Handle an interrupt, exception, or system call from user space
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     let scause = scause::read();
     let stval = stval::read();
-    match scause.cause() {
-        Trap::Exception(Exception::UserEnvCall) => {
-            // jump to next instruction anyway
-            let mut cx = current_trap_cx();
-            cx.sepc += 4;
-            // get system call return value
-            let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]);
-            // cx is changed during sys_exec, so we have to call it again
-            cx = current_trap_cx();
-            cx.x[10] = result as usize;
+    let cause = scause.cause();
+    
+    match cause {
+        Trap::Exception(code) => {
+            match code {
+                EXCEPTION_USER_ECALL => {
+                    // jump to next instruction anyway
+                    let mut cx = current_trap_cx();
+                    cx.sepc += 4;
+                    // get system call return value
+                    let result = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]);
+                    // cx is changed during sys_exec, so we have to call it again
+                    cx = current_trap_cx();
+                    cx.x[10] = result as usize;
+                }
+                EXCEPTION_STORE_FAULT
+                | EXCEPTION_STORE_PAGE_FAULT
+                | EXCEPTION_INSTRUCTION_FAULT
+                | EXCEPTION_INSTRUCTION_PAGE_FAULT
+                | EXCEPTION_LOAD_FAULT
+                | EXCEPTION_LOAD_PAGE_FAULT => {
+                    println!(
+                        "[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
+                        stval,
+                        current_trap_cx().sepc,
+                    );
+                    // page fault exit code
+                    exit_current_and_run_next(-2);
+                }
+                EXCEPTION_ILLEGAL_INSTRUCTION => {
+                    println!("[kernel] IllegalInstruction in application, kernel killed it.");
+                    // illegal instruction exit code
+                    exit_current_and_run_next(-3);
+                }
+                _ => {
+                    panic!(
+                        "Unsupported exception {:?}, stval = {:#x}!",
+                        cause,
+                        stval
+                    );
+                }
+            }
         }
-        Trap::Exception(Exception::StoreFault)
-        | Trap::Exception(Exception::StorePageFault)
-        | Trap::Exception(Exception::InstructionFault)
-        | Trap::Exception(Exception::InstructionPageFault)
-        | Trap::Exception(Exception::LoadFault)
-        | Trap::Exception(Exception::LoadPageFault) => {
-            println!(
-                "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
-                scause.cause(),
-                stval,
-                current_trap_cx().sepc,
-            );
-            // page fault exit code
-            exit_current_and_run_next(-2);
-        }
-        Trap::Exception(Exception::IllegalInstruction) => {
-            println!("[kernel] IllegalInstruction in application, kernel killed it.");
-            // illegal instruction exit code
-            exit_current_and_run_next(-3);
-        }
-        Trap::Interrupt(Interrupt::SupervisorTimer) => {
-            set_next_trigger();
-            suspend_current_and_run_next();
-        }
-        _ => {
-            panic!(
-                "Unsupported trap {:?}, stval = {:#x}!",
-                scause.cause(),
-                stval
-            );
+        Trap::Interrupt(code) => {
+            match code {
+                INTERRUPT_SUPERVISOR_TIMER => {
+                    set_next_trigger();
+                    suspend_current_and_run_next();
+                }
+                _ => {
+                    panic!(
+                        "Unsupported interrupt {:?}, stval = {:#x}!",
+                        cause,
+                        stval
+                    );
+                }
+            }
         }
     }
-    //println!("before trap_return");
     trap_return();
 }
 
 #[no_mangle]
-/// set the new addr of __restore asm function in TRAMPOLINE page,
+/// Set the new addr of __restore asm function in TRAMPOLINE page,
 /// set the reg a0 = trap_cx_ptr, reg a1 = phy addr of usr page table,
 /// finally, jump to new addr of __restore asm function
 pub fn trap_return() -> ! {

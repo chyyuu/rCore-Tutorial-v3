@@ -13,6 +13,7 @@ impl Write for Stdout {
     }
 }
 
+/// Print formatted string
 pub fn print(args: fmt::Arguments) {
     Stdout.write_fmt(args).unwrap();
 }
@@ -26,9 +27,13 @@ macro_rules! print {
 }
 
 #[macro_export]
-/// println string macro
+/// println string macro with timestamp
 macro_rules! println {
     ($fmt: literal $(, $($arg: tt)+)?) => {
-        $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
+        $crate::console::print(format_args!(
+            concat!("[{:>5} ms] ", $fmt, "\n"),
+            $crate::timer::get_time_ms()
+            $(, $($arg)+)?
+        ));
     }
 }
