@@ -6,6 +6,11 @@ edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+# Enable M-Mode SBI implementation for -bios none boot
+nobios = []
+
 [dependencies]
 log = "0.4"
 sbi-rt = { version = "0.0.2", features = ["legacy"] }
