@@ -1,68 +1,98 @@
 //! Implementation of [`PageTableEntry`] and [`PageTable`].
+
 use super::{frame_alloc, FrameTracker, PhysAddr, PhysPageNum, StepByOne, VirtAddr, VirtPageNum};
+#[allow(unused_imports)]
+use super::address::PTES_PER_PAGE;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use bitflags::*;
 
 bitflags! {
+    /// Page table entry flags
     pub struct PTEFlags: u8 {
+        /// Valid
         const V = 1 << 0;
+        /// Readable
         const R = 1 << 1;
+        /// Writable
         const W = 1 << 2;
+        /// Executable
         const X = 1 << 3;
+        /// User accessible
         const U = 1 << 4;
+        /// Global
         const G = 1 << 5;
+        /// Accessed
         const A = 1 << 6;
+        /// Dirty
         const D = 1 << 7;
     }
 }
 
+/// PPN shift in PTE (same for both SV39 and SV32)
+const PPN_SHIFT: usize = 10;
+
+/// PPN mask width
+#[cfg(target_pointer_width = "64")]
+const PPN_MASK_WIDTH: usize = 44;
+#[cfg(target_pointer_width = "32")]
+const PPN_MASK_WIDTH: usize = 22;
+
+/// Number of page table levels
+#[cfg(target_pointer_width = "64")]
+#[allow(dead_code)]
+const PAGE_TABLE_LEVELS: usize = 3;
+#[cfg(target_pointer_width = "32")]
+#[allow(dead_code)]
+const PAGE_TABLE_LEVELS: usize = 2;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
-/// page table entry structure
+/// Page table entry structure
 pub struct PageTableEntry {
-    ///PTE
+    /// PTE bits
     pub bits: usize,
 }
 
 impl PageTableEntry {
-    ///Create a PTE from ppn
+    /// Create a PTE from ppn
     pub fn new(ppn: PhysPageNum, flags: PTEFlags) -> Self {
         PageTableEntry {
-            bits: ppn.0 << 10 | flags.bits as usize,
+            bits: ppn.0 << PPN_SHIFT | flags.bits as usize,
         }
     }
-    ///Return an empty PTE
+    /// Return an empty PTE
     pub fn empty() -> Self {
         PageTableEntry { bits: 0 }
     }
-    ///Return 44bit ppn
+    /// Return PPN
     pub fn ppn(&self) -> PhysPageNum {
-        (self.bits >> 10 & ((1usize << 44) - 1)).into()
+        (self.bits >> PPN_SHIFT & ((1usize << PPN_MASK_WIDTH) - 1)).into()
     }
-    ///Return 10bit flag
+    /// Return flags
     pub fn flags(&self) -> PTEFlags {
         PTEFlags::from_bits(self.bits as u8).unwrap()
     }
-    ///Check PTE valid
+    /// Check PTE valid
     pub fn is_valid(&self) -> bool {
         (self.flags() & PTEFlags::V) != PTEFlags::empty()
     }
-    ///Check PTE readable
+    /// Check PTE readable
     pub fn readable(&self) -> bool {
         (self.flags() & PTEFlags::R) != PTEFlags::empty()
     }
-    ///Check PTE writable
+    /// Check PTE writable
     pub fn writable(&self) -> bool {
         (self.flags() & PTEFlags::W) != PTEFlags::empty()
     }
-    ///Check PTE executable
+    /// Check PTE executable
     pub fn executable(&self) -> bool {
         (self.flags() & PTEFlags::X) != PTEFlags::empty()
     }
 }
 
+/// Page table structure
 pub struct PageTable {
     root_ppn: PhysPageNum,
     frames: Vec<FrameTracker>,
@@ -70,6 +100,7 @@ pub struct PageTable {
 
 /// Assume that it won't oom when creating/mapping.
 impl PageTable {
+    /// Create a new page table
     pub fn new() -> Self {
         let frame = frame_alloc().unwrap();
         PageTable {
@@ -80,10 +111,15 @@ impl PageTable {
     /// Temporarily used to get arguments from user space.
     pub fn from_token(satp: usize) -> Self {
         Self {
+            #[cfg(target_pointer_width = "64")]
             root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
+            #[cfg(target_pointer_width = "32")]
+            root_ppn: PhysPageNum::from(satp & ((1usize << 22) - 1)),
             frames: Vec::new(),
         }
     }
+
+    #[cfg(target_pointer_width = "64")]
     fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
@@ -103,6 +139,29 @@ impl PageTable {
         }
         result
     }
+
+    #[cfg(target_pointer_width = "32")]
+    fn find_pte_create(&mut self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[*idx];
+            if i == 1 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                let frame = frame_alloc().unwrap();
+                *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
+                self.frames.push(frame);
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+
+    #[cfg(target_pointer_width = "64")]
     fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
@@ -120,36 +179,71 @@ impl PageTable {
         }
         result
     }
+
+    #[cfg(target_pointer_width = "32")]
+    fn find_pte(&self, vpn: VirtPageNum) -> Option<&mut PageTableEntry> {
+        let idxs = vpn.indexes();
+        let mut ppn = self.root_ppn;
+        let mut result: Option<&mut PageTableEntry> = None;
+        for (i, idx) in idxs.iter().enumerate() {
+            let pte = &mut ppn.get_pte_array()[*idx];
+            if i == 1 {
+                result = Some(pte);
+                break;
+            }
+            if !pte.is_valid() {
+                return None;
+            }
+            ppn = pte.ppn();
+        }
+        result
+    }
+
     #[allow(unused)]
+    /// Map a virtual page to a physical page
     pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
         let pte = self.find_pte_create(vpn).unwrap();
         assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
     }
+
     #[allow(unused)]
+    /// Unmap a virtual page
     pub fn unmap(&mut self, vpn: VirtPageNum) {
         let pte = self.find_pte(vpn).unwrap();
         assert!(pte.is_valid(), "vpn {:?} is invalid before unmapping", vpn);
         *pte = PageTableEntry::empty();
     }
+
+    /// Translate a virtual page number to page table entry
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.find_pte(vpn).map(|pte| *pte)
     }
+
+    /// Translate a virtual address to physical address
     pub fn translate_va(&self, va: VirtAddr) -> Option<PhysAddr> {
         self.find_pte(va.clone().floor()).map(|pte| {
-            //println!("translate_va:va = {:?}", va);
             let aligned_pa: PhysAddr = pte.ppn().into();
-            //println!("translate_va:pa_align = {:?}", aligned_pa);
             let offset = va.page_offset();
             let aligned_pa_usize: usize = aligned_pa.into();
             (aligned_pa_usize + offset).into()
         })
     }
+
+    /// Get SATP token
     pub fn token(&self) -> usize {
-        8usize << 60 | self.root_ppn.0
+        #[cfg(target_pointer_width = "64")]
+        {
+            8usize << 60 | self.root_ppn.0
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            1usize << 31 | self.root_ppn.0
+        }
     }
 }
-/// translate a pointer to a mutable u8 Vec through page table
+
+/// Translate a pointer to a mutable u8 Vec through page table
 pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&'static mut [u8]> {
     let page_table = PageTable::from_token(token);
     let mut start = ptr as usize;
@@ -171,7 +265,8 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     }
     v
 }
-/// translate a pointer to a mutable u8 Vec end with `\0` through page table to a `String`
+
+/// Translate a pointer to a mutable u8 Vec end with `\0` through page table to a `String`
 pub fn translated_str(token: usize, ptr: *const u8) -> String {
     let page_table = PageTable::from_token(token);
     let mut string = String::new();
@@ -190,12 +285,11 @@ pub fn translated_str(token: usize, ptr: *const u8) -> String {
     }
     string
 }
-///translate a generic through page table and return a mutable reference
+
+/// Translate a generic through page table and return a mutable reference
 pub fn translated_refmut<T>(token: usize, ptr: *mut T) -> &'static mut T {
-    //println!("into translated_refmut!");
     let page_table = PageTable::from_token(token);
     let va = ptr as usize;
-    //println!("translated_refmut: before translate_va");
     page_table
         .translate_va(VirtAddr::from(va))
         .unwrap()

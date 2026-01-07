@@ -11,6 +11,7 @@
 //! It then calls different functionality based on what exactly the exception
 //! was. For example, timer interrupts trigger task preemption, and syscalls go
 //! to [`syscall()`].
+
 mod context;
 
 use crate::config::{TRAMPOLINE, TRAP_CONTEXT};
@@ -20,14 +21,17 @@ use crate::task::{
 };
 use crate::timer::set_next_trigger;
 use core::arch::{asm, global_asm};
-use riscv::register::{
-    mtvec::TrapMode,
-    scause::{self, Exception, Interrupt, Trap},
-    sie, stval, stvec,
-};
+use riscv::interrupt::supervisor::{Exception, Interrupt};
+use riscv::interrupt::Trap;
+use riscv::register::{mtvec::TrapMode, scause, sie, stval, stvec};
 
-global_asm!(include_str!("trap.S"));
-/// initialize CSR `stvec` as the entry of `__alltraps`
+// Include architecture-specific trap assembly
+#[cfg(target_pointer_width = "64")]
+global_asm!(include_str!("trap_rv64.S"));
+#[cfg(target_pointer_width = "32")]
+global_asm!(include_str!("trap_rv32.S"));
+
+/// Initialize CSR `stvec` as the entry of `__alltraps`
 pub fn init() {
     set_kernel_trap_entry();
 }
@@ -43,21 +47,26 @@ fn set_user_trap_entry() {
         stvec::write(TRAMPOLINE as usize, TrapMode::Direct);
     }
 }
-/// enable timer interrupt in sie CSR
+
+/// Enable timer interrupt in sie CSR
 pub fn enable_timer_interrupt() {
     unsafe {
         sie::set_stimer();
     }
 }
 
-#[no_mangle]
-/// handle an interrupt, exception, or system call from user space
+#[unsafe(no_mangle)]
+/// Handle an interrupt, exception, or system call from user space
 pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     let scause = scause::read();
     let stval = stval::read();
-    match scause.cause() {
-        Trap::Exception(Exception::UserEnvCall) => {
+
+    // Convert raw trap cause to typed trap cause
+    let cause: Result<Trap<Interrupt, Exception>, _> = scause.cause().try_into();
+
+    match cause {
+        Ok(Trap::Exception(Exception::UserEnvCall)) => {
             // jump to next instruction anyway
             let mut cx = current_trap_cx();
             cx.sepc += 4;
@@ -67,12 +76,12 @@ pub fn trap_handler() -> ! {
             cx = current_trap_cx();
             cx.x[10] = result as usize;
         }
-        Trap::Exception(Exception::StoreFault)
-        | Trap::Exception(Exception::StorePageFault)
-        | Trap::Exception(Exception::InstructionFault)
-        | Trap::Exception(Exception::InstructionPageFault)
-        | Trap::Exception(Exception::LoadFault)
-        | Trap::Exception(Exception::LoadPageFault) => {
+        Ok(Trap::Exception(Exception::StoreFault))
+        | Ok(Trap::Exception(Exception::StorePageFault))
+        | Ok(Trap::Exception(Exception::InstructionFault))
+        | Ok(Trap::Exception(Exception::InstructionPageFault))
+        | Ok(Trap::Exception(Exception::LoadFault))
+        | Ok(Trap::Exception(Exception::LoadPageFault)) => {
             println!(
                 "[kernel] {:?} in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.",
                 scause.cause(),
@@ -82,12 +91,12 @@ pub fn trap_handler() -> ! {
             // page fault exit code
             exit_current_and_run_next(-2);
         }
-        Trap::Exception(Exception::IllegalInstruction) => {
+        Ok(Trap::Exception(Exception::IllegalInstruction)) => {
             println!("[kernel] IllegalInstruction in application, kernel killed it.");
             // illegal instruction exit code
             exit_current_and_run_next(-3);
         }
-        Trap::Interrupt(Interrupt::SupervisorTimer) => {
+        Ok(Trap::Interrupt(Interrupt::SupervisorTimer)) => {
             set_next_trigger();
             suspend_current_and_run_next();
         }
@@ -102,17 +111,17 @@ pub fn trap_handler() -> ! {
     trap_return();
 }
 
-#[no_mangle]
-/// set the new addr of __restore asm function in TRAMPOLINE page,
+#[unsafe(no_mangle)]
+/// Set the new addr of __restore asm function in TRAMPOLINE page,
 /// set the reg a0 = trap_cx_ptr, reg a1 = phy addr of usr page table,
 /// finally, jump to new addr of __restore asm function
 pub fn trap_return() -> ! {
     set_user_trap_entry();
     let trap_cx_ptr = TRAP_CONTEXT;
     let user_satp = current_user_token();
-    extern "C" {
-        fn __alltraps();
-        fn __restore();
+    unsafe extern "C" {
+        safe fn __alltraps();
+        safe fn __restore();
     }
     let restore_va = __restore as usize - __alltraps as usize + TRAMPOLINE;
     unsafe {
@@ -127,7 +136,7 @@ pub fn trap_return() -> ! {
     }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 /// Unimplement: traps/interrupts/exceptions from kernel mode
 /// Todo: Chapter 9: I/O device
 pub fn trap_from_kernel() -> ! {
