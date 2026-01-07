@@ -1,3 +1,5 @@
+# Trap handling assembly for RV64
+
 .altmacro
 .macro SAVE_GP n
     sd x\n, \n*8(sp)
@@ -5,6 +7,7 @@
 .macro LOAD_GP n
     ld x\n, \n*8(sp)
 .endm
+
     .section .text.trampoline
     .globl __alltraps
     .globl __restore
@@ -67,3 +70,5 @@ __restore:
     # back to user stack
     ld sp, 2*8(sp)
     sret
+
+

@@ -31,9 +31,15 @@ fn backtrace() {
         if fp == stop {
             break;
         }
+        #[cfg(target_pointer_width = "64")]
         unsafe {
             println!("#{}:ra={:#x}", i, *((fp - 8) as *const usize));
             fp = *((fp - 16) as *const usize);
+        }
+        #[cfg(target_pointer_width = "32")]
+        unsafe {
+            println!("#{}:ra={:#x}", i, *((fp - 4) as *const usize));
+            fp = *((fp - 8) as *const usize);
         }
     }
     println!("---END   BACKTRACE---");

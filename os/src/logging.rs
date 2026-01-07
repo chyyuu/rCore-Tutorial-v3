@@ -1,8 +1,4 @@
-/*！
-
-本模块利用 log crate 为你提供了日志功能，使用方式见 main.rs.
-
-*/
+//! Simple logging implementation using the log crate
 
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
@@ -33,6 +29,7 @@ impl Log for SimpleLogger {
     fn flush(&self) {}
 }
 
+/// Initialize the logger
 pub fn init() {
     static LOGGER: SimpleLogger = SimpleLogger;
     log::set_logger(&LOGGER).unwrap();
@@ -45,3 +42,4 @@ pub fn init() {
         _ => LevelFilter::Info,
     });
 }
+

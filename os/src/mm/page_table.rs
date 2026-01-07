@@ -17,6 +17,23 @@ bitflags! {
     }
 }
 
+/// PPN shift in PTE (same for both SV39 and SV32)
+const PPN_SHIFT: usize = 10;
+
+/// PPN mask width
+#[cfg(target_pointer_width = "64")]
+const PPN_MASK_WIDTH: usize = 44;
+#[cfg(target_pointer_width = "32")]
+const PPN_MASK_WIDTH: usize = 22;
+
+/// Number of page table levels
+#[cfg(target_pointer_width = "64")]
+#[allow(dead_code)]
+const PAGE_TABLE_LEVELS: usize = 3;
+#[cfg(target_pointer_width = "32")]
+#[allow(dead_code)]
+const PAGE_TABLE_LEVELS: usize = 2;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct PageTableEntry {
@@ -26,14 +43,14 @@ pub struct PageTableEntry {
 impl PageTableEntry {
     pub fn new(ppn: PhysPageNum, flags: PTEFlags) -> Self {
         PageTableEntry {
-            bits: ppn.0 << 10 | flags.bits as usize,
+            bits: ppn.0 << PPN_SHIFT | flags.bits as usize,
         }
     }
     pub fn empty() -> Self {
         PageTableEntry { bits: 0 }
     }
     pub fn ppn(&self) -> PhysPageNum {
-        (self.bits >> 10 & ((1usize << 44) - 1)).into()
+        (self.bits >> PPN_SHIFT & ((1usize << PPN_MASK_WIDTH) - 1)).into()
     }
     pub fn flags(&self) -> PTEFlags {
         PTEFlags::from_bits(self.bits as u8).unwrap()
@@ -69,7 +86,10 @@ impl PageTable {
     /// Temporarily used to get arguments from user space.
     pub fn from_token(satp: usize) -> Self {
         Self {
+            #[cfg(target_pointer_width = "64")]
             root_ppn: PhysPageNum::from(satp & ((1usize << 44) - 1)),
+            #[cfg(target_pointer_width = "32")]
+            root_ppn: PhysPageNum::from(satp & ((1usize << 22) - 1)),
             frames: Vec::new(),
         }
     }
@@ -77,9 +97,14 @@ impl PageTable {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
+        #[cfg(target_pointer_width = "64")]
+        const LAST_LEVEL: usize = 2;
+        #[cfg(target_pointer_width = "32")]
+        const LAST_LEVEL: usize = 1;
+        
         for (i, idx) in idxs.iter().enumerate() {
             let pte = &mut ppn.get_pte_array()[*idx];
-            if i == 2 {
+            if i == LAST_LEVEL {
                 result = Some(pte);
                 break;
             }
@@ -96,9 +121,14 @@ impl PageTable {
         let idxs = vpn.indexes();
         let mut ppn = self.root_ppn;
         let mut result: Option<&mut PageTableEntry> = None;
+        #[cfg(target_pointer_width = "64")]
+        const LAST_LEVEL: usize = 2;
+        #[cfg(target_pointer_width = "32")]
+        const LAST_LEVEL: usize = 1;
+        
         for (i, idx) in idxs.iter().enumerate() {
             let pte = &mut ppn.get_pte_array()[*idx];
-            if i == 2 {
+            if i == LAST_LEVEL {
                 result = Some(pte);
                 break;
             }
@@ -132,8 +162,16 @@ impl PageTable {
             (aligned_pa_usize + offset).into()
         })
     }
+    /// Get SATP token
     pub fn token(&self) -> usize {
-        8usize << 60 | self.root_ppn.0
+        #[cfg(target_pointer_width = "64")]
+        {
+            8usize << 60 | self.root_ppn.0
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            1usize << 31 | self.root_ppn.0
+        }
     }
 }
 

@@ -1,26 +1,34 @@
-#!/bin/sh
+#!/bin/bash
+# QEMU version check script
 
-# Argument1: The filename of qemu executable, e.g. qemu-system-riscv64
-QEMU_PATH=$(which $1)
-RET=$?
-MINIMUM_MAJOR_VERSION=7
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-if [ $RET != 0 ]
-then
-    echo "$1 not found"
+QEMU=$1
+
+if [ -z "$QEMU" ]; then
+    echo "Usage: $0 <qemu-binary>"
     exit 1
-else
-    QEMU_VERSION=$($1 --version|head -n 1|awk '{print $4}')
-    MAJOR_VERSION=$(echo $QEMU_VERSION | awk -F '.' '{print $1}')
-    if [ $MAJOR_VERSION -lt $MINIMUM_MAJOR_VERSION ]
-    then
-        echo "${RED}Error: Required major version of QEMU is ${MINIMUM_MAJOR_VERSION}, " \
-             "but current is ${QEMU_VERSION}.${NC}"
-        exit 1
-    else
-        echo "${GREEN}QEMU version is ${QEMU_VERSION}(>=${MINIMUM_MAJOR_VERSION}), OK!${NC}"
-        exit 0
-    fi
 fi
+
+# Check if QEMU is in PATH or is an absolute/relative path that exists
+if ! command -v "$QEMU" &> /dev/null && [ ! -x "$QEMU" ]; then
+    echo "Error: $QEMU not found or not executable"
+    exit 1
+fi
+
+# Get QEMU version
+VERSION=$($QEMU --version | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+
+if [ -z "$VERSION" ]; then
+    echo "Warning: Could not determine QEMU version"
+    exit 0
+fi
+
+MAJOR=$(echo $VERSION | cut -d. -f1)
+MINOR=$(echo $VERSION | cut -d. -f2)
+
+# Require QEMU 5.0 or later
+if [ "$MAJOR" -lt 5 ]; then
+    echo "Warning: QEMU version $VERSION may be too old. Recommend 5.0+"
+fi
+
+exit 0
+

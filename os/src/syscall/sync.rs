@@ -4,7 +4,7 @@ use crate::timer::{add_timer, get_time_ms};
 use alloc::sync::Arc;
 
 pub fn sys_sleep(ms: usize) -> isize {
-    let expire_ms = get_time_ms() + ms;
+    let expire_ms = get_time_ms() as usize + ms;
     let task = current_task().unwrap();
     add_timer(expire_ms, task);
     block_current_and_run_next();

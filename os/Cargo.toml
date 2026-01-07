@@ -2,12 +2,12 @@
 name = "os"
 version = "0.1.0"
 authors = ["Yifan Wu <shinbokuow@163.com>"]
-edition = "2024"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-riscv = { git = "https://github.com/rcore-os/riscv", features = ["inline-asm"] }
+riscv = "0.12"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 buddy_system_allocator = "0.6"
 bitflags = "1.2.1"
@@ -15,7 +15,12 @@ xmas-elf = "0.7.0"
 virtio-drivers = { git = "https://github.com/rcore-os/virtio-drivers", rev = "4ee80e5" }
 easy-fs = { path = "../easy-fs" }
 log = "0.4"
-sbi-rt = { version = "0.0.2", features = ["legacy"] }
+
+[features]
+default = []
+nobios = []
+board_qemu = []
+board_k210 = []
 
 [profile.release]
 debug = true
