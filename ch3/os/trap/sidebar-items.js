@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["enable_timer_interrupt","timer interrupt enabled"],["init","initialize CSR `stvec` as the entry of `__alltraps`"],["trap_handler","handle an interrupt, exception, or system call from user space"]],"mod":[["context",""]],"struct":[["TrapContext","Trap Context"]]};
+window.SIDEBAR_ITEMS = {"constant":["EXCEPTION_ILLEGAL_INSTRUCTION","EXCEPTION_STORE_FAULT","EXCEPTION_STORE_PAGE_FAULT","EXCEPTION_USER_ECALL","INTERRUPT_SUPERVISOR_TIMER"],"fn":["enable_timer_interrupt","init","trap_handler"],"mod":["context"],"struct":["TrapContext"]};
