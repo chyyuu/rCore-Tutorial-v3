@@ -15,25 +15,31 @@ const PPN_WIDTH_SV39: usize = PA_WIDTH_SV39 - PAGE_SIZE_BITS;
 const VPN_WIDTH_SV39: usize = VA_WIDTH_SV39 - PAGE_SIZE_BITS;
 
 // RV32: SV32 paging mode
+// Note: SV32 physical address is 34-bit, but we use 32-bit usize
+// The physical memory we use (0x80000000-0x88000000) fits in 32-bit
 #[cfg(target_pointer_width = "32")]
-const PA_WIDTH_SV32: usize = 34;
+#[allow(dead_code)]
+const PA_WIDTH_SV32: usize = 32; // Using 32 to fit in usize
 #[cfg(target_pointer_width = "32")]
+#[allow(dead_code)]
 const VA_WIDTH_SV32: usize = 32;
 #[cfg(target_pointer_width = "32")]
-const PPN_WIDTH_SV32: usize = PA_WIDTH_SV32 - PAGE_SIZE_BITS;
+const PPN_WIDTH_SV32: usize = 22; // 34 - 12 = 22 for SV32, but we use 20 bits (32-12) in usize
 #[cfg(target_pointer_width = "32")]
-const VPN_WIDTH_SV32: usize = VA_WIDTH_SV32 - PAGE_SIZE_BITS;
+const VPN_WIDTH_SV32: usize = VA_WIDTH_SV32 - PAGE_SIZE_BITS; // 20 bits
 
 /// Get PA width based on architecture
 #[cfg(target_pointer_width = "64")]
 const PA_WIDTH: usize = PA_WIDTH_SV39;
 #[cfg(target_pointer_width = "32")]
+#[allow(dead_code)]
 const PA_WIDTH: usize = PA_WIDTH_SV32;
 
 /// Get VA width based on architecture
 #[cfg(target_pointer_width = "64")]
 const VA_WIDTH: usize = VA_WIDTH_SV39;
 #[cfg(target_pointer_width = "32")]
+#[allow(dead_code)]
 const VA_WIDTH: usize = VA_WIDTH_SV32;
 
 /// Get PPN width based on architecture
@@ -93,22 +99,52 @@ impl Debug for PhysPageNum {
 
 impl From<usize> for PhysAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PA_WIDTH) - 1))
+        #[cfg(target_pointer_width = "64")]
+        {
+            Self(v & ((1 << PA_WIDTH) - 1))
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            // For RV32, usize is already 32-bit, no masking needed
+            Self(v)
+        }
     }
 }
 impl From<usize> for PhysPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << PPN_WIDTH) - 1))
+        #[cfg(target_pointer_width = "64")]
+        {
+            Self(v & ((1 << PPN_WIDTH) - 1))
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            Self(v & ((1 << PPN_WIDTH) - 1))
+        }
     }
 }
 impl From<usize> for VirtAddr {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VA_WIDTH) - 1))
+        #[cfg(target_pointer_width = "64")]
+        {
+            Self(v & ((1 << VA_WIDTH) - 1))
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            // For RV32, usize is already 32-bit, no masking needed
+            Self(v)
+        }
     }
 }
 impl From<usize> for VirtPageNum {
     fn from(v: usize) -> Self {
-        Self(v & ((1 << VPN_WIDTH) - 1))
+        #[cfg(target_pointer_width = "64")]
+        {
+            Self(v & ((1 << VPN_WIDTH) - 1))
+        }
+        #[cfg(target_pointer_width = "32")]
+        {
+            Self(v & ((1 << VPN_WIDTH) - 1))
+        }
     }
 }
 impl From<PhysAddr> for usize {

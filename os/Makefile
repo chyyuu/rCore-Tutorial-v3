@@ -2,12 +2,14 @@
 ARCH ?= riscv64
 
 # QEMU path (can be overridden)
+# For riscv64, we use the custom built QEMU; for riscv32, we use system QEMU
 QEMU_DIR ?= /home/chyyuu/thecodes/qemu-7.0.0/build
 
 # Building configuration based on architecture
 ifeq ($(ARCH), riscv32)
     TARGET := riscv32imac-unknown-none-elf
-    QEMU_NAME := $(QEMU_DIR)/riscv32-softmmu/qemu-system-riscv32
+    # Use system-installed qemu-system-riscv32
+    QEMU_NAME := qemu-system-riscv32
     OBJDUMP := rust-objdump --arch-name=riscv32
     OBJCOPY := rust-objcopy --binary-architecture=riscv32
     GDB_ARCH := riscv:rv32

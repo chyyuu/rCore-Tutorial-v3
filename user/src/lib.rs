@@ -1,22 +1,20 @@
 #![no_std]
-#![feature(linkage)]
 
 #[macro_use]
 pub mod console;
 mod lang_items;
 mod syscall;
 
-#[no_mangle]
-#[link_section = ".text.entry"]
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".text.entry")]
 pub extern "C" fn _start() -> ! {
-    exit(main());
-    panic!("unreachable after sys_exit!");
+    // SAFETY: main is provided by each binary and must be correctly implemented
+    exit(unsafe { main() });
 }
 
-#[linkage = "weak"]
-#[no_mangle]
-fn main() -> i32 {
-    panic!("Cannot find main!");
+// External main function - each binary must define its own main
+unsafe extern "C" {
+    fn main() -> i32;
 }
 
 use syscall::*;
@@ -24,8 +22,9 @@ use syscall::*;
 pub fn write(fd: usize, buf: &[u8]) -> isize {
     sys_write(fd, buf)
 }
-pub fn exit(exit_code: i32) -> isize {
-    sys_exit(exit_code)
+pub fn exit(exit_code: i32) -> ! {
+    sys_exit(exit_code);
+    panic!("unreachable after sys_exit!");
 }
 pub fn yield_() -> isize {
     sys_yield()
