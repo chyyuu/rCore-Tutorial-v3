@@ -1,3 +1,6 @@
+# S-Mode entry point
+# Works for both RV32 and RV64
+
     .section .text.entry
     .globl _start
 _start:
