@@ -4,6 +4,7 @@
 
 */
 
+use crate::timer::get_time_ms;
 use log::{self, Level, LevelFilter, Log, Metadata, Record};
 
 struct SimpleLogger;
@@ -23,9 +24,12 @@ impl Log for SimpleLogger {
             Level::Debug => 32, // Green
             Level::Trace => 90, // BrightBlack
         };
-        println!(
-            "\u{1B}[{}m[{:>5}] {}\u{1B}[0m",
+        let time_ms = get_time_ms();
+        // Use print! (without timestamp) to avoid double timestamp
+        print!(
+            "\u{1B}[{}m[{:>5} ms] [{:>5}] {}\u{1B}[0m\n",
             color,
+            time_ms,
             record.level(),
             record.args(),
         );

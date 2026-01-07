@@ -29,6 +29,7 @@ mod console;
 mod lang_items;
 mod logging;
 mod sbi;
+mod timer;
 
 // M-Mode SBI implementation (only used when booting with -bios none)
 #[cfg(feature = "nobios")]
