@@ -19,11 +19,16 @@ use crate::syscall::syscall;
 use core::arch::global_asm;
 use riscv::register::{
     mtvec::TrapMode,
-    scause::{self, Exception, Trap},
+    scause::{self, Trap},
     stval, stvec,
 };
 
-global_asm!(include_str!("trap.S"));
+// Select architecture-specific trap assembly file
+#[cfg(target_pointer_width = "64")]
+global_asm!(include_str!("trap_rv64.S"));
+
+#[cfg(target_pointer_width = "32")]
+global_asm!(include_str!("trap_rv32.S"));
 
 /// initialize CSR `stvec` as the entry of `__alltraps`
 pub fn init() {
@@ -35,21 +40,27 @@ pub fn init() {
     }
 }
 
+// Exception codes from RISC-V spec
+const EXCEPTION_USER_ECALL: usize = 8;
+const EXCEPTION_STORE_FAULT: usize = 7;
+const EXCEPTION_STORE_PAGE_FAULT: usize = 15;
+const EXCEPTION_ILLEGAL_INSTRUCTION: usize = 2;
+
 #[unsafe(no_mangle)]
 /// handle an interrupt, exception, or system call from user space
 pub fn trap_handler(cx: &mut TrapContext) -> &mut TrapContext {
     let scause = scause::read(); // get trap cause
     let stval = stval::read(); // get extra value
     match scause.cause() {
-        Trap::Exception(Exception::UserEnvCall) => {
+        Trap::Exception(EXCEPTION_USER_ECALL) => {
             cx.sepc += 4;
             cx.x[10] = syscall(cx.x[17], [cx.x[10], cx.x[11], cx.x[12]]) as usize;
         }
-        Trap::Exception(Exception::StoreFault) | Trap::Exception(Exception::StorePageFault) => {
+        Trap::Exception(EXCEPTION_STORE_FAULT) | Trap::Exception(EXCEPTION_STORE_PAGE_FAULT) => {
             println!("[kernel] PageFault in application, kernel killed it.");
             run_next_app();
         }
-        Trap::Exception(Exception::IllegalInstruction) => {
+        Trap::Exception(EXCEPTION_ILLEGAL_INSTRUCTION) => {
             println!("[kernel] IllegalInstruction in application, kernel killed it.");
             run_next_app();
         }
