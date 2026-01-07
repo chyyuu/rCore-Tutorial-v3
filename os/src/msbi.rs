@@ -164,7 +164,7 @@ fn handle_timer(time: u64) -> SbiRet {
 /// - a7: EID (extension ID)
 /// 
 /// Returns (error, value) in a0, a1
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub extern "C" fn m_trap_handler(
     a0: usize,
     a1: usize,

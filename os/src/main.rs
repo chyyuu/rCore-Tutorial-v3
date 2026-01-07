@@ -43,27 +43,27 @@ global_asm!(include_str!("entry.asm"));
 
 /// clear BSS segment
 pub fn clear_bss() {
-    unsafe extern "C" {
-        safe fn sbss();
-        safe fn ebss();
+    extern "C" {
+        fn sbss();
+        fn ebss();
     }
     (sbss as usize..ebss as usize).for_each(|a| unsafe { (a as *mut u8).write_volatile(0) });
 }
 
 /// the rust entry-point of os
-#[unsafe(no_mangle)]
+#[no_mangle]
 pub fn rust_main() -> ! {
-    unsafe extern "C" {
-        safe fn stext(); // begin addr of text segment
-        safe fn etext(); // end addr of text segment
-        safe fn srodata(); // start addr of Read-Only data segment
-        safe fn erodata(); // end addr of Read-Only data segment
-        safe fn sdata(); // start addr of data segment
-        safe fn edata(); // end addr of data segment
-        safe fn sbss(); // start addr of BSS segment
-        safe fn ebss(); // end addr of BSS segment
-        safe fn boot_stack_lower_bound(); // stack lower bound
-        safe fn boot_stack_top(); // stack top
+    extern "C" {
+        fn stext(); // begin addr of text segment
+        fn etext(); // end addr of text segment
+        fn srodata(); // start addr of Read-Only data segment
+        fn erodata(); // end addr of Read-Only data segment
+        fn sdata(); // start addr of data segment
+        fn edata(); // end addr of data segment
+        fn sbss(); // start addr of BSS segment
+        fn ebss(); // end addr of BSS segment
+        fn boot_stack_lower_bound(); // stack lower bound
+        fn boot_stack_top(); // stack top
     }
     clear_bss();
     logging::init();
